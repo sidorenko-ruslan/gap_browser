@@ -17,7 +17,10 @@ TARGET = gap_browser
 
 SOURCES += \
         main.cpp \
-    browser.cpp
+    browser.cpp \
+    remote_command_listener.cpp
 
 HEADERS += \
-    browser.h
+    browser.h \
+    remote_command_listener.h \
+    global.h

@@ -7,8 +7,8 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setApplicationName("gap browser");
     QCoreApplication::setApplicationVersion("0.0.1");
 
-    Browser browser(3000);
-    if (!browser.startServer()) {
+    Browser browser;
+    if (!browser.startServer(3000)) {
         std::cerr << "unable to start listen server!\n";
         return -1;
     }

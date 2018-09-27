@@ -11,49 +11,37 @@
 
 #include <iostream>
 
-Browser::Browser(uint _portNumber)
-    : QObject(), webPage(new QWebEnginePage), tcpServer(new QTcpServer(this)),
-      portNumber(_portNumber) {
+Browser::Browser()
+    : QObject(), webPage(new QWebEnginePage(this)), commandListener(new RemoteCommandListener(this)) {
 
-    connect(tcpServer,SIGNAL(newConnection()),this,SLOT(readCommand()));
 }
 
 Browser::~Browser() {
-    tcpServer->close();
     webPage->profile()->cookieStore()->deleteAllCookies();
     webPage->profile()->clearHttpCache();
 }
 
-bool Browser::startServer() {
-    if (!tcpServer->listen(QHostAddress::Any,portNumber)) {
-        return false;
-    }
-    std::cout << "server started at port: 3000" << std::endl;
-    return true;
+bool Browser::startServer(uint _portNumber) {
+    return commandListener->start(_portNumber);
 }
 
 void Browser::readCommand() {
-    //QByteArray block;
-    //QDataStream out(&block, QIODevice::WriteOnly);
-    //out.setVersion(QDataStream::Qt_5_10);
+    QTcpSocket* clientConnection = static_cast<QTcpSocket*>(sender());
+    QJsonDocument d = QJsonDocument::fromJson(clientConnection->readAll());
+    QString command = d.object().value("command").toString();
+    QString commandData = d.object().value("command_data").toString();
+    executeCommand(ClientCommand(command,commandData));
 
-    //out << "success\r\n";
+    clientConnection->write("success\r\n");
+    clientConnection->waitForBytesWritten();
+    clientConnection->close();
+    clientConnection->disconnectFromHost();
+}
 
+void Browser::readClientReply() {
     QTcpSocket* clientConnection = tcpServer->nextPendingConnection();
-
     connect(clientConnection, &QAbstractSocket::disconnected, clientConnection, &QObject::deleteLater);
-    connect(clientConnection, &QAbstractSocket::readyRead, this, [this,&clientConnection]() {
-        //QTcpSocket* clientConnection = static_cast<QTcpSocket*>(sender());
-        QJsonDocument d = QJsonDocument::fromJson(clientConnection->readAll());
-        QString command = d.object().value("command").toString();
-        QString commandData = d.object().value("command_data").toString();
-        executeCommand(ClientCommand(command,commandData));
-
-        clientConnection->write("success\r\n");
-        clientConnection->waitForBytesWritten();
-        clientConnection->close();
-        clientConnection->disconnectFromHost();
-    });
+    connect(clientConnection, &QAbstractSocket::readyRead, this, &Browser::readCommand);
 }
 
 void Browser::executeCommand(const ClientCommand& command) {
